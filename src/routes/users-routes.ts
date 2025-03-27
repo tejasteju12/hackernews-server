@@ -1,17 +1,32 @@
 import { Hono } from "hono";
-import { getAllUsers, getUserById } from "../controllers/users-controller.js";
-import { tokenMiddleware } from "../middlewares/token-middleware.js";
+import { tokenMiddleware } from "./middlewares/token-middleware";
+import { getAllUsers, getMe } from "../controllers/users/users-controller";
+import { GetMeError } from "../controllers/users/users-types";
 
 export const usersRoutes = new Hono();
 
-usersRoutes.get("/", async (c) => {
-  const users = await getAllUsers();
-  return c.json(users);
+usersRoutes.get("/me", tokenMiddleware, async (context) => {
+  const userId = context.get("userId");
+
+  try {
+    const user = await getMe({ userId });
+    return context.json({ data: user }, 200);
+  } catch (e) {
+    if (e === GetMeError.BAD_REQUEST) {
+      return context.json({ error: "User not found" }, 400);
+    }
+    return context.json({ message: "Internal Server Error" }, 500);
+  }
 });
 
-usersRoutes.get("/:id", tokenMiddleware, async (c) => {
-  const id = c.req.param("id");
-  const user = await getUserById(id);
-  if (!user) return c.json({ message: "User not found" }, 404);
-  return c.json(user);
+usersRoutes.get("", tokenMiddleware, async (context) => {
+  const page = Number(context.req.query("page") || 1);
+  const pageSize = Number(context.req.query("pageSize") || 10);
+
+  try {
+    const users = await getAllUsers({ page, pageSize });
+    return context.json({ data: users }, 200);
+  } catch (e) {
+    return context.json({ message: "Internal Server Error" }, 500);
+  }
 });
