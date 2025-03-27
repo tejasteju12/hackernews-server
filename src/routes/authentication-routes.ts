@@ -1,20 +1,116 @@
 import { Hono } from "hono";
-import { registerUser, loginUser } from "../controllers/authentication-controller.js";
+import {
+  logInWithUsernameAndPassword,
+  signUpWithUsernameAndPassword,
+} from "../controllers/authentication/authentication-controller";
+import {
+  LogInWtihUsernameAndPasswordError,
+  SignUpWithUsernameAndPasswordError,
+} from "../controllers/authentication/authentication-types";
 
 export const authenticationRoutes = new Hono();
 
-authenticationRoutes.post("/register", async (c) => {
-  const { username, password, name } = await c.req.json();
-  const user = await registerUser(username, password, name);
-  return c.json({ message: "User registered", data: user }, 201);
+// Sign-up endpoint (POST instead of GET as per REST conventions)
+authenticationRoutes.post("/sign-up", async (context) => {
+  try {
+    const { username, password, name } = await context.req.json();
+
+    if (!username || !password) {
+      return context.json(
+        {
+          message: "Username and password are required",
+        },
+        400
+      );
+    }
+
+    const result = await signUpWithUsernameAndPassword({
+      username,
+      password,
+      name,
+    });
+
+    return context.json(
+      {
+        data: {
+          token: result.token,
+          user: {
+            id: result.user.id,
+            username: result.user.username,
+            name: result.user.name,
+          },
+        },
+      },
+      201
+    );
+  } catch (e) {
+    if (e === SignUpWithUsernameAndPasswordError.CONFLICTING_USERNAME) {
+      return context.json(
+        {
+          message: "Username already exists",
+        },
+        409
+      );
+    }
+
+    console.error("Sign-up error:", e);
+    return context.json(
+      {
+        message: "Internal Server Error",
+      },
+      500
+    );
+  }
 });
 
-authenticationRoutes.post("/login", async (c) => {
-  const { username, password } = await c.req.json();
+// Log-in endpoint (POST instead of GET as per REST conventions)
+authenticationRoutes.post("/log-in", async (context) => {
   try {
-    const { user, token } = await loginUser(username, password);
-    return c.json({ message: "Login successful", token, user });
-  } catch (error) {
-    return c.json({ message: "Invalid credentials" }, 401);
+    const { username, password } = await context.req.json();
+
+    if (!username || !password) {
+      return context.json(
+        {
+          message: "Username and password are required",
+        },
+        400
+      );
+    }
+
+    const result = await logInWithUsernameAndPassword({
+      username,
+      password,
+    });
+
+    return context.json(
+      {
+        data: {
+          token: result.token,
+          user: {
+            id: result.user.id,
+            username: result.user.username,
+            name: result.user.name,
+          },
+        },
+      },
+      200
+    );
+  } catch (e) {
+    if (e === LogInWtihUsernameAndPasswordError.INCORRECT_USERNAME_OR_PASSWORD) {
+      return context.json(
+        {
+          message: "Incorrect username or password",
+        },
+        401
+      );
+    }
+
+    console.error("Log-in error:", e);
+    return context.json(
+      {
+        message: "Internal Server Error",
+      },
+      500
+    );
   }
 });
