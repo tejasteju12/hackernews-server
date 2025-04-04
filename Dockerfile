@@ -10,11 +10,11 @@ COPY src ./src
 # Copy Prisma folder only if it exists by copying everything, relying on .dockerignore
 COPY . .
 
-RUN npm ci --only=production
+RUN npm install
 
 RUN if [ -f "./prisma/schema.prisma" ]; then npx prisma generate; else echo "Skipping prisma generate"; fi
 
-RUN npm run build || { echo "Build failed. Check your build script and dependencies."; exit 1; }
+RUN npm run build
 
 EXPOSE 3000
 
