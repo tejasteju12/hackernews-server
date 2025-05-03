@@ -8,13 +8,13 @@ import { postsRoutes } from "../controllers/posts";
 import { likeRoutes } from "../controllers/likes";
 import { commentRoutes } from "../controllers/comments";
 import { authenticationRoutes } from "../routes/authentication-routes";
-
+import { webClientUrl } from "../environment";
 
 export const allRoutes = new Hono();
 allRoutes.use(
   "*",
   cors({
-    origin: "https://hackernews-www-owrh.vercel.app", // ✅ Only allow your frontend
+    origin: webClientUrl, // ✅ Only allow your frontend
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
