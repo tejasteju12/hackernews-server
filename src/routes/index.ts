@@ -14,7 +14,7 @@ export const allRoutes = new Hono();
 allRoutes.use(
   "*",
   cors({
-    origin: "https://hackernews-www-8jj2.vercel.app", // ✅ Only allow your frontend
+    origin: "https://hackernews-www-y93o.vercel.app", // ✅ Only allow your frontend
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
