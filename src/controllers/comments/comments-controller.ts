@@ -1,121 +1,394 @@
-import { getPagination } from "../../extras/pagination";
-import { prismaClient } from "../../integrations/prisma";
-
+import { prismaClient as prisma } from "../../integrations/prisma/index.js";
 import {
-  CommentStatus,
-  type CreatCommentResult,
-  type CommentResult,
-} from "./comments-types";
+  GetCommentsError,
+  CreateCommentError,
+  type GetCommentsResult,
+  type CreateCommentResult,
+  DeleteCommentError,
+  UpdateCommentError,
+  type UpdateCommentResult,
+  type GetCommentsOnPostsResult,
+  type GetCommentsOnMeResult,
+  GetCommentsOnMeError,
+  GetCommentsOnUserError,
+  type GetCommentsOnUserResult,
+} from "./comments-types.js";
 
-export const createComment = async (params: {
-  content: string;
-  postId: string;
-  userId: string;
-}): Promise<CreatCommentResult> => {
-  try {
-    const existPostId = await prismaClient.post.findUnique({
-      where: { id: params.postId },
-    });
-
-    if (!existPostId) {
-      throw new Error(CommentStatus.POST_NOT_FOUND);
-    }
-
-    const result = await prismaClient.comment.create({
-      data: {
-        content: params.content,
-        post: { connect: { id: params.postId } },
-        user: { connect: { id: params.userId } },
-      },
-    });
-
-    return { comment: result };
-  } catch (error) {
-    console.error("Error creating comment:", error);
-    throw new Error(CommentStatus.COMMENT_CREATION_FAILED);
-  }
-};
-
-// Get all comments for a post (reverse chronological order, paginated)
-export const getAllComments = async (params: {
+export const GetComments = async (parameters: {
   postId: string;
   page: number;
   limit: number;
-}): Promise<{ comments: any[] }> => {
+}): Promise<GetCommentsResult> => {
   try {
-    const { skip, take } = getPagination(params.page, params.limit);
+    const { postId, page, limit } = parameters;
 
-    const comments = await prismaClient.comment.findMany({
-      where: { postId: params.postId }, // Filter by postId
-      orderBy: { createdAt: "desc" }, // Reverse chronological order
+    if (page < 1 || limit < 1) {
+      throw GetCommentsError.PAGE_BEYOND_LIMIT;
+    }
+
+    const skip = (page - 1) * limit;
+
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      throw GetCommentsError.POST_NOT_FOUND;
+    }
+
+    const totalComments = await prisma.comment.count({
+      where: { postId },
+    });
+
+    if (totalComments === 0) {
+      throw GetCommentsError.COMMENTS_NOT_FOUND;
+    }
+
+    const totalPages = Math.ceil(totalComments / limit);
+    if (page > totalPages) {
+      throw GetCommentsError.PAGE_BEYOND_LIMIT;
+    }
+
+    const comments = await prisma.comment.findMany({
+      where: { postId },
+      orderBy: { createdAt: "desc" },
       skip,
-      take,
+      take: limit,
       include: {
         user: {
           select: {
-            id: true,
             username: true,
+            name: true,
           },
         },
       },
     });
 
-    if (!comments || comments.length === 0) {
-      return { comments: [] };
-    }
-
     return { comments };
-  } catch (error) {
-    console.error("Error fetching comments:", error);
-    throw new Error(CommentStatus.UNKNOWN);
+  } catch (e) {
+    console.error(e);
+    if (
+      e === GetCommentsError.POST_NOT_FOUND ||
+      e === GetCommentsError.COMMENTS_NOT_FOUND ||
+      e === GetCommentsError.PAGE_BEYOND_LIMIT
+    ) {
+      throw e;
+    }
+    throw GetCommentsError.UNKNOWN;
   }
 };
 
-export const deleteComment = async (params: {
-  commentId: string;
+export const CreateComment = async (parameters: {
+  postId: string;
   userId: string;
-}): Promise<CommentStatus> => {
+  content: string;
+}): Promise<CreateCommentResult> => {
   try {
-    const comment = await prismaClient.comment.findUnique({
-      where: { id: params.commentId },
+    const { postId, userId, content } = parameters;
+
+    if (!content.trim()) {
+      throw CreateCommentError.INVALID_INPUT;
+    }
+
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+      include: {
+        author: {
+          select: {
+            username: true,
+            name: true,
+          },
+        },
+      },
+    });
+    if (!post) {
+      throw CreateCommentError.POST_NOT_FOUND;
+    }
+
+    const comment = await prisma.comment.create({
+      data: {
+        content,
+        postId,
+        userId,
+      },
+      include: {
+        user: {
+          select: {
+            username: true,
+            name: true,
+          },
+        },
+      },
     });
 
-    if (!comment) {
-      return CommentStatus.COMMENT_NOT_FOUND;
+    return { comment };
+  } catch (e) {
+    console.error(e);
+    if (
+      e === CreateCommentError.POST_NOT_FOUND ||
+      e === CreateCommentError.INVALID_INPUT
+    ) {
+      throw e;
     }
-
-    await prismaClient.comment.delete({ where: { id: params.commentId } });
-
-    return CommentStatus.DELETE_SUCCESS;
-  } catch (error) {
-    console.error("Error deleting comment:", error);
-    return CommentStatus.UNKNOWN;
+    throw CreateCommentError.UNKNOWN;
   }
 };
 
-//update comment controller
-export const updateComment = async (params: {
+export const UpdateComment = async (parameters: {
   commentId: string;
   userId: string;
   content: string;
-}): Promise<CommentStatus> => {
+}): Promise<UpdateCommentResult> => {
   try {
-    const comment = await prismaClient.comment.findUnique({
-      where: { id: params.commentId },
+    const { commentId, userId, content } = parameters;
+
+    if (!content.trim()) {
+      throw UpdateCommentError.INVALID_INPUT;
+    }
+
+    const existingComment = await prisma.comment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!existingComment) {
+      throw UpdateCommentError.COMMENT_NOT_FOUND;
+    }
+
+    if (existingComment.userId !== userId) {
+      throw UpdateCommentError.UNAUTHORIZED;
+    }
+
+    if (
+      existingComment.content.toLowerCase().trim() ===
+      content.toLowerCase().trim()
+    ) {
+      throw UpdateCommentError.NO_CHANGES;
+    }
+
+    const comment = await prisma.comment.update({
+      where: { id: commentId },
+      data: { content },
+      include: {
+        user: {
+          select: {
+            username: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return { comment };
+  } catch (e) {
+    console.error(e);
+    if (
+      e === UpdateCommentError.COMMENT_NOT_FOUND ||
+      e === UpdateCommentError.INVALID_INPUT ||
+      e === UpdateCommentError.NO_CHANGES ||
+      e === UpdateCommentError.UNAUTHORIZED
+    ) {
+      throw e;
+    }
+    throw UpdateCommentError.UNKNOWN;
+  }
+};
+
+export const DeleteComment = async (parameters: {
+  commentId: string;
+  userId: string;
+}): Promise<void> => {
+  try {
+    const { commentId, userId } = parameters;
+
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
     });
 
     if (!comment) {
-      return CommentStatus.COMMENT_NOT_FOUND;
+      throw DeleteCommentError.COMMENT_NOT_FOUND;
     }
 
-    await prismaClient.comment.update({
-      where: { id: params.commentId },
-      data: { content: params.content },
+    if (comment.userId !== userId) {
+      throw DeleteCommentError.UNAUTHORIZED;
+    }
+
+    await prisma.comment.delete({
+      where: { id: commentId },
+    });
+  } catch (e) {
+    console.error(e);
+    if (
+      e === DeleteCommentError.COMMENT_NOT_FOUND ||
+      e === DeleteCommentError.UNAUTHORIZED
+    ) {
+      throw e;
+    }
+    throw DeleteCommentError.UNKNOWN;
+  }
+};
+
+export const GetCommentsOnPosts = async (parameters: {
+  page: number;
+  limit: number;
+}): Promise<GetCommentsOnPostsResult> => {
+  try {
+    const { page, limit } = parameters;
+
+    if (page < 1 || limit < 1) {
+      throw new Error("Page or limit is below 1");
+    }
+
+    const skip = (page - 1) * limit;
+
+    const totalComments = await prisma.comment.count({
+      where: { postId: { not: null } as any },
     });
 
-    return CommentStatus.UPDATE_SUCCESS;
-  } catch (error) {
-    console.error("Error updating comment:", error);
-    return CommentStatus.UNKNOWN;
+    if (totalComments === 0) {
+      throw new Error("No comments found");
+    }
+
+    const totalPages = Math.ceil(totalComments / limit);
+
+    if (page > totalPages) {
+      throw new Error("Page exceeds total pages");
+    }
+
+    const comments = await prisma.comment.findMany({
+      where: { postId: { not: null } as any },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      include: {
+        user: {
+          select: {
+            username: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return { comments };
+  } catch (e) {
+    console.error(e);
+    throw new Error(e instanceof Error ? e.message : "Unknown error");
+  }
+};
+
+export const GetCommentsOnMe = async (parameters: {
+  userId: string;
+}): Promise<GetCommentsOnMeResult> => {
+  try {
+    const { userId } = parameters;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+      },
+    });
+    if (!user) {
+      throw GetCommentsOnMeError.USER_NOT_FOUND;
+    }
+    const comments = await prisma.comment.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        post: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    return { comments };
+  } catch (e) {
+    console.error(e);
+    if (e === GetCommentsOnMeError.COMMENTS_NOT_FOUND) {
+      throw e;
+    }
+    if (e === GetCommentsOnMeError.PAGE_BEYOND_LIMIT) {
+      throw e;
+    }
+    if (e === GetCommentsOnMeError.USER_NOT_FOUND) {
+      throw e;
+    }
+    throw GetCommentsOnMeError.UNKNOWN;
+  }
+};
+
+export const GetCommentsOnUser = async (parameters: {
+  username: string;
+  page: number;
+  limit: number;
+}): Promise<GetCommentsOnUserResult> => {
+  try {
+    const { username, page, limit } = parameters;
+
+    const user = await prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!user) {
+      throw GetCommentsOnUserError.USER_NOT_FOUND;
+    }
+
+    if (page < 1 || limit < 1) {
+      throw new Error("Page or limit is below 1");
+    }
+
+    const skip = (page - 1) * limit;
+
+    const totalComments = await prisma.comment.count({
+      where: { userId: user.id },
+    });
+
+    if (totalComments === 0) {
+      throw new Error("No comments found");
+    }
+
+    const totalPages = Math.ceil(totalComments / limit);
+
+    if (page > totalPages) {
+      throw new Error("Page exceeds total pages");
+    }
+
+    const comments = await prisma.comment.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      include: {
+        post: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    return { comments };
+  } catch (e) {
+    console.error(e);
+    if (e === GetCommentsOnUserError.COMMENTS_NOT_FOUND) {
+      throw e;
+    }
+    if (e === GetCommentsOnUserError.PAGE_BEYOND_LIMIT) {
+      throw e;
+    }
+    if (e === GetCommentsOnUserError.USER_NOT_FOUND) {
+      throw e;
+    }
+    if (e === GetCommentsOnUserError.POST_NOT_FOUND) {
+      throw e;
+    }
+    throw GetCommentsOnUserError.UNKNOWN;
   }
 };

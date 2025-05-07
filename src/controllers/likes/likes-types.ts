@@ -1,37 +1,58 @@
-export type LikeUser = {
-  id: string;
-  name: string | null;
+import type { Like } from "../../generated/prisma/index.js";
+
+export type GetLikesResult = {
+  likes: Like[];
 };
 
-export type LikeItem = {
-  id: string;
-  createdAt: Date;
-  user: LikeUser;
-};
-
-export type LikeActionResult = {
-  status: LikeStatus;
-};
-
-export enum LikeStatus {
-  LIKE_ADDED = "LIKE_ADDED",
-  LIKE_DELETED = "LIKE_DELETED",
-  LIKE_NOT_FOUND = "LIKE_NOT_FOUND",
+export enum GetLikesError {
   POST_NOT_FOUND = "POST_NOT_FOUND",
-  NO_LIKES_FOUND = "NO_LIKES_FOUND",
+  LIKES_NOT_FOUND = "LIKES_NOT_FOUND",
+  PAGE_NOT_FOUND = "PAGE_NOT_FOUND",
   UNKNOWN = "UNKNOWN",
-  ALREADY_LIKED = "ALREADY_LIKED",
-  LIKE_SUCCESS = "LIKE_SUCCESS",
 }
 
-export type GetLikesResult =
-  | {
-      status: "SUCCESS";
-      likes: LikeItem[];
-    }
-  | {
-      status:
-        | LikeStatus.POST_NOT_FOUND
-        | LikeStatus.NO_LIKES_FOUND
-        | LikeStatus.UNKNOWN;
-    };
+export type LikePostResult = {
+  like: Like,
+  message: string
+}
+
+export enum LikePostError {
+    POST_NOT_FOUND = "POST_NOT_FOUND",
+    USER_NOT_FOUND = "USER_NOT_FOUND",
+    UNKNOWN = "UNKNOWN",
+    ALREADY_LIKED = "ALREADY_LIKED"
+}
+
+export type DeleteLikeResult = {
+    message: string
+}
+
+export enum DeleteLikeError {
+    POST_NOT_FOUND = "POST_NOT_FOUND",
+    LIKE_NOT_FOUND = "LIKE_NOT_FOUND",
+    USER_NOT_FOUND = "USER_NOT_FOUND",
+    UNKNOWN = "UNKNOWN"
+}
+
+export type GetLikesOnMeResult = {  
+  likes: Like[];
+};
+
+export enum GetLikesOnMeError {
+  LIKES_NOT_FOUND = "LIKES_NOT_FOUND",
+  PAGE_NOT_FOUND = "PAGE_NOT_FOUND",
+  USER_NOT_FOUND = "USER_NOT_FOUND",
+  UNKNOWN = "UNKNOWN",
+}
+
+export type GetLikesOnUserResult = {
+  likes: Like[];
+};
+
+export enum GetLikesOnUserError {
+  LIKES_NOT_FOUND = "LIKES_NOT_FOUND",
+  USER_NOT_FOUND = "USER_NOT_FOUND",
+  PAGE_NOT_FOUND = "PAGE_NOT_FOUND",
+  POST_NOT_FOUND = "POST_NOT_FOUND",
+  UNKNOWN = "UNKNOWN",
+}
