@@ -21,4 +21,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Start with debug logging (optional)
-CMD ["sh", "-c", "ls -la dist && node dist/index.js"]
+CMD ["node dist/index.js"]
