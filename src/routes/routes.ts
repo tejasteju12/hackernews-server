@@ -17,9 +17,9 @@ allRoutes.use(
   cors({
     origin: [webClientUrl],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    credentials: true,
     allowHeaders: ["Content-Type", "Authorization", "token"],
     exposeHeaders: ["Content-Length"],
+    credentials: true,
     maxAge: 600,
   })
 );
@@ -27,7 +27,7 @@ allRoutes.use(
 allRoutes.get("/ui", swaggerUI({ url: "/docs" }));
 
 allRoutes.route("/api/auth", authRoute);
-allRoutes.route("/auth", authenticationRoutes);
+allRoutes.route("/authen", authenticationRoutes);
 allRoutes.route("/users", usersRoutes);
 allRoutes.route("/posts", postsRoutes);
 allRoutes.route("/likes", likesRoutes);
