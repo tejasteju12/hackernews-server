@@ -5,10 +5,13 @@ export type GetMeResult = {
     comments: {
       id: string;
       content: string;
-      postId: string;
+      postId: string | null;
       createdAt: Date;
       updatedAt: Date;
       userId: string;
+      post: { // Add this to include the post title in the comments
+        title: string;
+      } | null; // post could be null if the postId is null
     }[];
     likes: {
       id: string;
@@ -16,6 +19,9 @@ export type GetMeResult = {
       createdAt: Date;
       updatedAt: Date;
       userId: string;
+      post: { // Add this to include the post title in the likes
+        title: string;
+      };
     }[];
     id: string;
     username: string;
