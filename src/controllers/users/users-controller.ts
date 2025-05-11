@@ -7,24 +7,12 @@ import {
   type UserDetails,
 } from "./users-types.js";
 
+
 export const GetMe = async (parameters: {
   userId: string;
-  page: number;
-  limit: number;
 }): Promise<GetMeResult> => {
   try {
-    const { userId, page, limit } = parameters;
-    const skip = (page - 1) * limit;
-
-    const totalUsers = await prisma.user.count();
-    if (totalUsers === 0) {
-      throw GetMeError.USER_NOT_FOUND;
-    }
-
-    const totalPages = Math.ceil(totalUsers / limit);
-    if (page > totalPages) {
-      throw GetMeError.PAGE_BEYOND_LIMIT;
-    }
+    const { userId } = parameters;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -53,6 +41,11 @@ export const GetMe = async (parameters: {
             createdAt: true,
             updatedAt: true,
             userId: true,
+            post: { // Include post title in comments
+              select: {
+                title: true,
+              },
+            },
           },
         },
         likes: {
@@ -62,6 +55,11 @@ export const GetMe = async (parameters: {
             createdAt: true,
             updatedAt: true,
             userId: true,
+            post: { // Include post title in likes
+              select: {
+                title: true,
+              },
+            },
           },
         },
       },
@@ -80,10 +78,7 @@ export const GetMe = async (parameters: {
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         posts: user.posts || [],
-        comments: user.comments ? user.comments.filter(comment => comment.postId !== null).map(comment => ({
-          ...comment,
-          postId: comment.postId as string
-        })) : [],
+        comments: user.comments || [],
         likes: user.likes || [],
       },
     };
@@ -94,6 +89,7 @@ export const GetMe = async (parameters: {
     throw GetMeError.UNKNOWN;
   }
 };
+
 
 export const GetUsers = async (parameter: {
   page: number;
@@ -199,4 +195,3 @@ export const GetUserById = async (userId: string): Promise<UserDetails> => {
     throw new Error("Unknown error");
   }
 };
-
