@@ -495,3 +495,15 @@ export const GetUserPostsBySlug = async (parameters: {
 };
 
 
+export async function searchPostsByTitle(query: string) {
+  if (!query) return [];
+
+  return prisma.post.findMany({
+    where: {
+      title: {
+        contains: query,
+        mode: "insensitive", // case-insensitive search
+      },
+    },
+  });
+}
