@@ -1,5 +1,7 @@
-import  betterAuthServerClient from "./src/integrations/better-auth";
+import betterAuthServerClient from "./src/integrations/better-auth.js";
+
+
 
 export default {
-  auth: betterAuthServerClient,
-};
+    auth : betterAuthServerClient
+}
